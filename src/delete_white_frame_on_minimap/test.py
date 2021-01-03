@@ -3,16 +3,20 @@ import numpy
 import os
 
 import shutil
+from glob import glob
 
 
-def main(movie_path: str, image_directory_path: str):
+def extract_image_from_replay(movie_path: str, image_directory_path: str):
     cap = cv2.VideoCapture(movie_path)
     delay = 1
     window_name = 'frame'
     cnt = 0
 
-    shutil.rmtree(image_directory_path)
+    # shutil.rmtree(image_directory_path)
+    # shutil.rmtree('output')
+
     os.makedirs(image_directory_path, exist_ok=True)
+    os.makedirs('../../output', exist_ok=True)
 
     if not cap.isOpened():
         exit()
@@ -40,79 +44,65 @@ def main(movie_path: str, image_directory_path: str):
 def detect_rectangle(image_path: str):
     img = cv2.imread(image_path)
 
-    # print(os.path.exists(image_path))
-
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)[1]
     contours = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours[0] if len(contours) == 2 else contours[1]
 
-    print(len(contours))
+    # print(len(contours))
 
-    for c in contours:
-        area = cv2.contourArea(c)
+    max_cnt = max(contours, key=lambda x: cv2.contourArea(x))
 
-        print(area)
+    if cv2.contourArea(max_cnt) > 100:
+        x, y, w, h = cv2.boundingRect(max_cnt)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
+   
 
-        if area > 1973:
-            x, y, w, h = cv2.boundingRect(c)
-            cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
+    # for c in contours:
+    #     area = cv2.contourArea(c)
 
+    #     print(area)
 
-    # blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    # # canny = cv2.Canny(blurred, 120, 255, 1)
-    # canny = cv2.Canny(blurred, 0, 30, 1)
-
-    # # Find contours
-    # cnts = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-
-    # # Iterate thorugh contours and draw rectangles around contours
-    # for c in cnts:
-    #     x, y, w, h = cv2.boundingRect(c)
-    #     cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
-
-
-    # # Find contours
-    # cnts = cv2.findContours(canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-
-    # # Iterate thorugh contours and draw rectangles around contours
-    # for c in cnts:
-    #     x, y, w, h = cv2.boundingRect(c)
-    #     cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
-
-    # # 輪郭を抽出
-    # _, contours = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    # font = cv2.FONT_HERSHEY_DUPLEX
-    # rectangle = 0
-
-    # for cnt in contours:
-    #     approx = cv2.approxPolyDP(cnt, 0.01*cv2.arcLength(cnt, True), True)
-    #     cv2.drawContours(img, [approx], 0, (0), 2)
-    #     x = approx.ravel()[0]
-    #     y = approx.ravel()[1]
-
-    #     for cnt in contours:
-    #         approx = cv2.approxPolyDP(cnt, 0.01*cv2.arcLength(cnt, True), True)
-    #         cv2.drawContours(img, [approx], 0, (0), 2)
-    #         x = approx.ravel()[0]
-    #         y = approx.ravel()[1]
-
-    #         if len(approx) == 4:
-    #             # rectangle +=1
-    #             cv2.putText(img, "rectangle{}".format(rectangle),  (x, y), font, 0.8, (0))?
+    #     if area > 26.9:
+    #         x, y, w, h = cv2.boundingRect(c)
+    #         cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
     
     # 結果の画像作成
-    cv2.imwrite('output.png',img)
+    # cv2.imwrite('output.png', img)
+    cv2.imwrite(image_path.replace('images', 'output'), img)
+
+
+def create_movie(movie_path: str, image_paths: list):
+    fourcc = cv2.VideoWriter_fourcc('m','p','4', 'v')
+    video  = cv2.VideoWriter(movie_path, fourcc, 30.0, (185, 185))
+
+    print('len: ', len(image_paths))
+
+    for image_path in image_paths:
+        img = cv2.imread(image_path)
+
+        # print(img.shape)
+        video.write(img)
+
+        # print(image_path)
+
+    video.release()
+
 
 
 if __name__ == '__main__':
     movie_file_path = '../../movie/target_movie.webm'
+    output_movie_file_path = '../../movie/output.mp4'
     image_directory_path = '../../images/'
-    image_path = '../../images/001620.png'
+    # image_path = '../../images/001200.png'
 
-    # main(movie_file_path, image_directory_path)
+    extract_image_from_replay(movie_file_path, image_directory_path)
 
-    detect_rectangle(image_path)
+    image_paths = sorted(glob('../../images/*.png'))
+
+    for image_path in image_paths:
+        detect_rectangle(image_path)
+
+    create_movie(output_movie_file_path, sorted(glob('../../output/*.png')))
+
+    print('finished.')
